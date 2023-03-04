@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config({ path: ".env" });
 
 const User = require("./models/users.model");
+const RefreshToken = require("./models/refreshToken.model");
 const isAuth = require("./isAuth");
 
 const db = require("./db");
@@ -96,7 +97,7 @@ app.post("/login", async (req, res, next) => {
   }
 });
 
-app.post("/home", isAuth, async (req, res, next) => {
+app.get("/home", isAuth, async (req, res, next) => {
   try {
     return res.json({
       success: true,
@@ -111,7 +112,67 @@ app.post("/home", isAuth, async (req, res, next) => {
   }
 });
 
-app.post("/refresh-token", async (req, res, next) => {});
+app.post("/refresh-token", async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    const decode = await jwt.verify(refreshToken, process.env.JWT_REFRESH_PRIVATE_KEY);
+
+    if (!decode) {
+      await RefreshToken.delete({ where: { token: refreshToken } });
+      return res.status(500).json({
+        success: false,
+        error: decode
+      });
+    }
+
+    const refresh = await RefreshToken.findUnique({
+      where: { token: refreshToken }
+    });
+
+    if (refresh.blacklisted) {
+      await RefreshToken.delete({ where: { token: refreshToken } });
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Request !! Please login"
+      });
+    }
+
+    const user = await User.findById(decode.id);
+
+    const access_token = jwt.sign(
+      {
+        id: user.id
+      },
+      process.env.JWT_ACCESS_PRIVATE_KEY,
+      {
+        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN
+      }
+    );
+
+    const refresh_token = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_PRIVATE_KEY, {
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN
+    });
+
+    await RefreshToken.update({
+      where: { token: refreshToken },
+      data: {
+        token: refresh_token
+      }
+    });
+
+    return res.json({
+      success: true,
+      access_token: access_token,
+      refreshToken: refresh_token
+    });
+  } catch (err) {
+    return res.json({
+      success: false,
+      error: err
+    });
+  }
+});
 
 db.then(() => {
   app.listen(8080, () => {
