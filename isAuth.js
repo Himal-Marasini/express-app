@@ -8,7 +8,7 @@ module.exports = async (req, res, next) => {
     const bearer = token.split(" ");
     token = bearer[1];
 
-    const decode = jwt.verify(token, process.env.JWT_PRIVATE_KEY, function (err, decoded) {
+    const decode = jwt.verify(token, process.env.JWT_ACCESS_PRIVATE_KEY, function (err, decoded) {
       if (err) return false;
       if (!decoded) return false;
       return decoded;
