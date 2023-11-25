@@ -39,7 +39,7 @@ app.post("/register", async (req, res, next) => {
 
     return res.json({
       success: true,
-      message: "user has been registered. please login",
+      message: "user has been registered. please login !!",
       data: user,
     });
   } catch (err) {
